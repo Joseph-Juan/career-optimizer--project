@@ -1,0 +1,420 @@
+{# templates/accounts/student_cv.html - Redesigned to be closer to Europass editor #}
+{% extends "accounts/base_student.html" %}
+{% load static %}
+{% block title %}My CV – CareerPath{% endblock %}
+
+{% block content %}
+<style>
+/* Small, local styles to nudge layout toward Europass-like editor */
+.cv-container { margin-top: 18px; }
+.cv-left {
+  background: #f3f6f9;
+  padding: 18px;
+  border-radius: 6px;
+  min-height: 420px;
+}
+.cv-left h5 { font-weight:700; margin-bottom:12px; }
+.cv-right .card { border-radius:6px; }
+.section-title {
+  font-weight:700;
+  font-size:1.05rem;
+  color:#2b2b2b;
+  margin-bottom:10px;
+}
+.form-section { padding:12px; }
+.small-muted { color:#6c757d; font-size:0.95rem; margin-bottom:10px; }
+.table thead th { vertical-align:middle; }
+.lang-other-input { display:none; margin-top:6px; }
+</style>
+
+<div class="container cv-container">
+  <h1 class="mb-2">Create / Edit CV</h1>
+  <p class="small-muted">This editor follows a Europass-style layout. Fill sections on the right; personal information stays on the left. Save to keep changes or Save &amp; Download to generate a PDF.</p>
+
+  <form method="post" id="cv-form" novalidate>
+    {% csrf_token %}
+    <div class="row g-4">
+      <!-- LEFT column: personal info -->
+      <div class="col-lg-4">
+        <div class="cv-left">
+          <h5>Personal information</h5>
+          <div class="mb-3">
+            <label class="form-label">{{ cv_form.full_name.label }}</label>
+            {{ cv_form.full_name }}
+            {% if cv_form.full_name.errors %}<div class="text-danger small">{{ cv_form.full_name.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ cv_form.email.label }}</label>
+            {{ cv_form.email }}
+            {% if cv_form.email.errors %}<div class="text-danger small">{{ cv_form.email.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ cv_form.phone.label }}</label>
+            {{ cv_form.phone }}
+            {% if cv_form.phone.errors %}<div class="text-danger small">{{ cv_form.phone.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ cv_form.address.label }}</label>
+            {{ cv_form.address }}
+            {% if cv_form.address.errors %}<div class="text-danger small">{{ cv_form.address.errors|striptags }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ cv_form.objective.label }}</label>
+            {{ cv_form.objective }}
+            {% if cv_form.objective.errors %}<div class="text-danger small">{{ cv_form.objective.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT column: experiences / languages -->
+      <div class="col-lg-8 cv-right">
+        <div class="card mb-3">
+          <div class="card-body form-section">
+            <div class="section-title">Work Experience</div>
+
+            {{ exp_formset.management_form }}
+            <div id="experience-list">
+              {% for form in exp_formset %}
+              <div class="mb-3 border rounded p-3 exp-entry" data-form-index="{{ forloop.counter0 }}">
+                {% if form.non_field_errors %}
+                  <div class="text-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <label class="form-label">{{ form.job_title.label }}</label>
+                    {{ form.job_title }}
+                    {% if form.job_title.errors %}<div class="text-danger small">{{ form.job_title.errors|striptags }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">{{ form.company.label }}</label>
+                    {{ form.company }}
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">{{ form.city.label }}</label>
+                    {{ form.city }}
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">{{ form.country.label }}</label>
+                    {{ form.country }}
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">{{ form.start_date.label }}</label>
+                    {{ form.start_date }}
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">{{ form.end_date.label }}</label>
+                    {{ form.end_date }}
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">{{ form.description.label }}</label>
+                    {{ form.description }}
+                  </div>
+                  <div class="col-12 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-exp">Remove</button>
+                  </div>
+                </div>
+                {{ form.id }}
+              </div>
+              {% endfor %}
+            </div>
+
+            <button type="button" id="add-experience" class="btn btn-outline-primary btn-sm mt-2">+ Add experience</button>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-body form-section">
+            <div class="section-title">Language skills</div>
+            <div class="small-muted">Select the language and set your CEFR level for each skill area.</div>
+
+            {{ lang_formset.management_form }}
+            <div class="table-responsive">
+              <table class="table table-bordered align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Language</th>
+                    <th class="text-center">Mother tongue</th>
+                    <th>Listening</th>
+                    <th>Reading</th>
+                    <th>Spoken interaction</th>
+                    <th>Spoken production</th>
+                    <th>Writing</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="language-list">
+                  {% for form in lang_formset %}
+                  <tr class="lang-row" data-form-index="{{ forloop.counter0 }}">
+                    <td style="min-width:170px;">
+                      {{ form.language }}
+                      {# hidden text input for "Other" if user picks Other #}
+                      <input type="text" class="form-control lang-other-input" placeholder="Specify language" />
+                      {% if form.language.errors %}<div class="text-danger small">{{ form.language.errors|striptags }}</div>{% endif %}
+                    </td>
+                    <td class="text-center align-middle">{{ form.mother_tongue }}</td>
+                    <td>{{ form.listening }}</td>
+                    <td>{{ form.reading }}</td>
+                    <td>{{ form.spoken_interaction }}</td>
+                    <td>{{ form.spoken_production }}</td>
+                    <td>{{ form.writing }}</td>
+                    <td class="text-center">
+                      <button type="button" class="btn btn-sm btn-outline-danger remove-lang">Remove</button>
+                    </td>
+                    {{ form.id }}
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <button type="button" id="add-language" class="btn btn-outline-primary btn-sm">+ Add language</button>
+          </div>
+        </div>
+
+        <div class="text-end">
+          <button type="submit" name="action" value="save" class="btn btn-secondary">Save</button>
+          <button type="submit" name="action" value="download" class="btn btn-success">Save &amp; Download PDF</button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  // Utility: get formset TOTAL_FORMS input
+  function totalForms(prefix){
+    const el = document.querySelector('input[name="'+prefix+'-TOTAL_FORMS"]');
+    return el ? parseInt(el.value, 10) : 0;
+  }
+  function setTotalForms(prefix, v){
+    const el = document.querySelector('input[name="'+prefix+'-TOTAL_FORMS"]');
+    if (el) el.value = v;
+  }
+
+  // Insert experience: uses empty template with __prefix__ placeholder
+  document.getElementById('add-experience').addEventListener('click', function(){
+    const prefix = 'exp';
+    const total = totalForms(prefix);
+    const tpl = document.getElementById('exp-empty-form') ? document.getElementById('exp-empty-form').innerHTML : null;
+    if (!tpl) {
+      // fallback: clone last entry if present
+      const last = document.querySelector('#experience-list .exp-entry');
+      if (last) {
+        const clone = last.cloneNode(true);
+        // clear values
+        clone.querySelectorAll('input, textarea').forEach(i => i.value = '');
+        document.getElementById('experience-list').appendChild(clone);
+        setTotalForms(prefix, total + 1);
+      } else {
+        alert('Unable to add experience form (template missing).');
+      }
+      return;
+    }
+    // replace __prefix__ with current index
+    const html = tpl.replace(/__prefix__/g, total);
+    const container = document.getElementById('experience-list');
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper.firstElementChild);
+    setTotalForms(prefix, total + 1);
+  });
+
+  // Insert language row
+  document.getElementById('add-language').addEventListener('click', function(){
+    const prefix = 'lang';
+    const total = totalForms(prefix);
+    const tplEl = document.getElementById('lang-empty-row');
+    if (!tplEl) {
+      // fallback: clone last
+      const last = document.querySelector('#language-list .lang-row');
+      if (last) {
+        const clone = last.cloneNode(true);
+        clone.querySelectorAll('select, input').forEach(i => {
+          if (i.type === 'checkbox') i.checked = false;
+          else i.value = '';
+        });
+        document.getElementById('language-list').appendChild(clone);
+        setTotalForms(prefix, total + 1);
+      } else {
+        alert('Unable to add language row (template missing).');
+      }
+      return;
+    }
+
+    const html = tplEl.innerHTML.replace(/__prefix__/g, total);
+    const tbody = document.getElementById('language-list');
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = html;
+    tbody.appendChild(tmp.firstElementChild);
+    setTotalForms(prefix, total + 1);
+  });
+
+  // Delegated remove handler
+  document.body.addEventListener('click', function(ev){
+    // remove experience
+    if (ev.target.matches('.remove-exp')){
+      const entry = ev.target.closest('.exp-entry');
+      if (!entry) return;
+      const deleteInput = entry.querySelector('input[name$="-DELETE"]');
+      const prefixInput = entry.querySelector('input[name$="-id"]');
+      const isExisting = prefixInput && prefixInput.value;
+      if (deleteInput && isExisting) {
+        deleteInput.checked = true;
+        entry.style.display = 'none';
+      } else {
+        entry.remove();
+        const prefix = 'exp';
+        const t = totalForms(prefix);
+        setTotalForms(prefix, Math.max(0, t - 1));
+      }
+    }
+
+    // remove language
+    if (ev.target.matches('.remove-lang')){
+      const row = ev.target.closest('.lang-row');
+      if (!row) return;
+      const deleteInput = row.querySelector('input[name$="-DELETE"]');
+      const prefixInput = row.querySelector('input[name$="-id"]');
+      const isExisting = prefixInput && prefixInput.value;
+      if (deleteInput && isExisting) {
+        deleteInput.checked = true;
+        row.style.display = 'none';
+      } else {
+        row.remove();
+        const prefix = 'lang';
+        const t = totalForms(prefix);
+        setTotalForms(prefix, Math.max(0, t - 1));
+      }
+    }
+  });
+
+  // Show / hide "Other" text input for language cells
+  function wireLanguageSelects(scope) {
+    (scope || document).querySelectorAll('select.language-select').forEach(function(sel){
+      // ensure we have an "other" sibling input (we rendered it in template)
+      const td = sel.closest('td') || sel.parentElement;
+      const otherInput = td ? td.querySelector('.lang-other-input') : null;
+
+      function update() {
+        if (sel.value === 'Other') {
+          if (otherInput) otherInput.style.display = 'block';
+        } else {
+          if (otherInput) {
+            otherInput.style.display = 'none';
+            otherInput.value = '';
+          }
+        }
+      }
+      sel.addEventListener('change', update);
+      // initial call
+      update();
+    });
+  }
+
+  wireLanguageSelects(document);
+
+  // When adding new rows, re-wire language selects after insertion
+  const observer = new MutationObserver(function(muts){
+    for (let m of muts) {
+      if (m.addedNodes && m.addedNodes.length) {
+        m.addedNodes.forEach(node => {
+          if (node.nodeType === 1) {
+            wireLanguageSelects(node);
+          }
+        });
+      }
+    }
+  });
+  const langList = document.getElementById('language-list');
+  if (langList) observer.observe(langList, { childList: true, subtree: true });
+
+  // On submit: if any language select has value 'Other', transfer the other text
+  document.getElementById('cv-form').addEventListener('submit', function(e){
+    // for each language row
+    document.querySelectorAll('#language-list .lang-row').forEach(function(row){
+      const sel = row.querySelector('select.language-select');
+      const other = row.querySelector('.lang-other-input');
+      if (sel && sel.value === 'Other') {
+        // find or create a hidden input with the same name as sel and set it, disable sel
+        const name = sel.name;
+        const val = other ? other.value.trim() : '';
+        // if no other text, ask user
+        if (!val) {
+          e.preventDefault();
+          alert('Please specify the language for any "Other" selected.');
+          other && other.focus();
+          throw 'abort-submit';
+        }
+        // create hidden input and disable select so the server receives the hidden value
+        const hid = document.createElement('input');
+        hid.type = 'hidden';
+        hid.name = name;
+        hid.value = val;
+        row.appendChild(hid);
+        sel.disabled = true;
+      }
+    });
+  });
+
+});
+</script>
+
+{# Hidden templates for dynamic formset insertion (Django empty_form output) #}
+{# Experience empty form #}
+<div id="exp-empty-form" style="display:none;">
+  {% comment %} use the empty_form provided by Django formset {% endcomment %}
+  <div class="mb-3 border rounded p-3 exp-entry" data-form-index="__prefix__">
+    <div class="row g-2">
+      <div class="col-md-6">
+        {{ exp_formset.empty_form.job_title.label_tag }}<br>{{ exp_formset.empty_form.job_title }}
+      </div>
+      <div class="col-md-6">
+        {{ exp_formset.empty_form.company.label_tag }}<br>{{ exp_formset.empty_form.company }}
+      </div>
+      <div class="col-md-4">
+        {{ exp_formset.empty_form.city.label_tag }}<br>{{ exp_formset.empty_form.city }}
+      </div>
+      <div class="col-md-4">
+        {{ exp_formset.empty_form.country.label_tag }}<br>{{ exp_formset.empty_form.country }}
+      </div>
+      <div class="col-md-4">
+        {{ exp_formset.empty_form.start_date.label_tag }}<br>{{ exp_formset.empty_form.start_date }}
+      </div>
+      <div class="col-md-4">
+        {{ exp_formset.empty_form.end_date.label_tag }}<br>{{ exp_formset.empty_form.end_date }}
+      </div>
+      <div class="col-12">
+        {{ exp_formset.empty_form.description.label_tag }}<br>{{ exp_formset.empty_form.description }}
+      </div>
+      <div class="col-12 text-end">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-exp">Remove</button>
+      </div>
+    </div>
+    {{ exp_formset.empty_form.id }}
+  </div>
+</div>
+
+{# Language empty row #}
+<table style="display:none;">
+  <tbody id="lang-empty-row">
+    <tr class="lang-row" data-form-index="__prefix__">
+      <td style="min-width:170px;">
+        {{ lang_formset.empty_form.language }}
+        <input type="text" class="form-control lang-other-input" placeholder="Specify language" />
+      </td>
+      <td class="text-center align-middle">{{ lang_formset.empty_form.mother_tongue }}</td>
+      <td>{{ lang_formset.empty_form.listening }}</td>
+      <td>{{ lang_formset.empty_form.reading }}</td>
+      <td>{{ lang_formset.empty_form.spoken_interaction }}</td>
+      <td>{{ lang_formset.empty_form.spoken_production }}</td>
+      <td>{{ lang_formset.empty_form.writing }}</td>
+      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-lang">Remove</button></td>
+      {{ lang_formset.empty_form.id }}
+    </tr>
+  </tbody>
+</table>
+{% endblock %}

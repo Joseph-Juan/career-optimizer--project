@@ -1,0 +1,65 @@
+{% extends "accounts/base_student.html" %}
+{% block title %}Browse Positions{% endblock %}
+{% block content %}
+  <h2>Browse Positions</h2>
+  <p class="text-muted mb-4">List of all posted positions and your match score.</p>
+
+  <div class="row gy-4">
+    {% for pos in positions %}
+      <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title">{{ pos.title }}</h5>
+            <h6 class="card-subtitle mb-2 text-muted">{{ pos.company }}</h6>
+            <p class="flex-grow-1">
+              <strong>Match Score:</strong> {{ pos.match_score }}%
+            </p>
+            <div class="d-flex align-items-center">
+              <button class="btn btn-link save-btn p-0"
+                      data-id="{{ pos.pk }}">
+                {% if pos.pk in saved_ids %}★{% else %}☆{% endif %}
+              </button>
+              <a href="{% url 'accounts:student_position_detail' pos.pk %}"
+                 class="btn btn-sm btn-outline-secondary ms-2">
+                View
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <p>No positions available right now.</p>
+    {% endfor %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+  let v=null;
+  document.cookie.split(';').forEach(c=>{
+    const [k,val]=c.trim().split('=');
+    if(k===name) v=decodeURIComponent(val);
+  });
+  return v;
+}
+const csrftoken = getCookie('csrftoken');
+document.querySelectorAll('.save-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const pid = btn.dataset.id;
+    fetch("{% url 'accounts:toggle_save_position' %}", {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrftoken
+      },
+      body: new URLSearchParams({ position_id: pid })
+    })
+    .then(r=>r.json())
+    .then(data=>{
+      btn.textContent = data.action==='added'?'★':'☆';
+    });
+  });
+});
+</script>
+{% endblock %}

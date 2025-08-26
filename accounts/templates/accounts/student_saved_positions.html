@@ -1,0 +1,32 @@
+{% extends "accounts/base_student.html" %}
+{% block title %}My Saved Positions{% endblock %}
+{% block content %}
+  <h2>My Saved Positions</h2>
+  <p class="text-muted mb-4">Your favorites are listed below.</p>
+
+  {% if saved_positions %}
+    <div class="row gy-4">
+      {% for sp in saved_positions %}
+        <div class="col-md-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+              <h5 class="card-title">{{ sp.position.title }}</h5>
+              <h6 class="card-subtitle mb-2 text-muted">
+                {{ sp.match_score|floatformat:1 }}% – {{ sp.position.company }}
+              </h6>
+              <p class="flex-grow-1">
+                Saved on {{ sp.saved_at|date:"M j, Y" }}
+              </p>
+              <a href="{% url 'accounts:student_position_detail' sp.position.pk %}"
+                 class="btn btn-sm btn-outline-secondary mt-auto">
+                View Details
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>You haven’t saved any positions yet.</p>
+  {% endif %}
+{% endblock %}

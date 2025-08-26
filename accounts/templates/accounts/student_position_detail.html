@@ -1,0 +1,39 @@
+{% extends "accounts/base_student.html" %}
+{% block title %}{{ position.title }} Details{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2>{{ position.title }}</h2>
+  <p><strong>Company:</strong> {{ position.company }}</p>
+
+  <h4 class="mt-3">Match Score: {{ match_score|floatformat:1 }}%</h4>
+  <p class="text-muted">(based on skills where your proficiency meets or exceeds required)</p>
+
+  <h5 class="mt-4">Requirements:</h5>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Skill</th>
+        <th>Your Proficiency</th>
+        <th>Required Proficiency</th>
+        <th>Weight (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in requirements %}
+      <tr>
+        <td>{{ r.skill.name }}</td>
+        <td class="{% if r.your_proficiency == 'High' %}text-success
+                    {% elif r.your_proficiency == 'Medium' %}text-warning
+                    {% elif r.your_proficiency == 'Low' %}text-danger
+                    {% else %}text-muted{% endif %}">
+          {{ r.your_proficiency|default:"None" }}
+        </td>
+        <td>{{ r.required_proficiency }}</td>
+        <td>{{ r.weight_pct|floatformat:1 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

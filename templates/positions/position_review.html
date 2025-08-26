@@ -1,0 +1,51 @@
+{% extends "accounts/base_admin.html" %}
+{% block title %}Step 3: Review{% endblock %}
+{% block navbar_title %}Step 3: Review{% endblock %}
+
+{% block content %}
+  <h4>{{ object.title }} — Step 3 of 3</h4>
+
+  <h5>Position Details</h5>
+  <p><strong>Company:</strong> {{ object.company }}</p>
+  <p><strong>Description:</strong> {{ object.description }}</p>
+  <p>
+    <strong>Tags:</strong>
+    {% for tag in object.tags.all %}
+      <span class="badge bg-secondary">{{ tag.name }}</span>
+    {% empty %}
+      <em>No tags.</em>
+    {% endfor %}
+  </p>
+  <hr>
+
+  <h5>Required Skills</h5>
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th>Skill</th>
+        <th>Proficiency</th>
+        <th>Importance</th>
+        <th>Weight (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for req in requirements_with_weight %}
+        <tr>
+          <td>{{ req.skill.name }}</td>
+          <td>{{ req.get_proficiency_display }}</td>
+          <td>{{ req.importance }}</td>
+          <td>{{ req.weight_norm }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4"><em>No skills added yet.</em></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form method="post">
+    {% csrf_token %}
+    <button name="action" value="post"  class="btn btn-success">✅ Post</button>
+    <button name="action" value="draft" class="btn btn-secondary">💾 Save as Draft</button>
+    <a href="{% url 'positions:new_skills' object.pk %}" class="btn btn-link">← Back</a>
+  </form>
+{% endblock %}

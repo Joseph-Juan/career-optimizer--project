@@ -1,0 +1,237 @@
+{% extends "accounts/base_student.html" %}
+{% load static %}
+{% block title %}My Skills{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2>My Skills</h2>
+
+  <table class="table align-middle mt-4">
+    <thead>
+      <tr><th>Skill</th><th>Proficiency</th><th>Remove</th></tr>
+    </thead>
+    <tbody id="current-skills-body">
+      {% for obj in current_skills %}
+      <tr data-pk="{{ obj.pk }}">
+        <td>{{ obj.skill.name }}</td>
+        <td>
+          {% for code, label in obj.PROFICIENCY_CHOICES %}
+          <label class="me-2">
+            <input type="radio"
+                   name="prof_{{ obj.pk }}"
+                   value="{{ code }}"
+                   {% if obj.proficiency == code %}checked{% endif %}>
+            {{ label }}
+          </label>
+          {% endfor %}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-danger remove-btn"
+                  data-category="{{ obj.skill.category }}">×</button>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3"><em>No skills yet.</em></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <button id="save-all-skills" class="btn btn-primary mb-4">
+    Save All Skills
+  </button>
+
+  <hr>
+
+  <label for="skillSearch" class="form-label">🔍 Search Skills:</label>
+  <input type="text" id="skillSearch" class="form-control mb-2" placeholder="Start typing…">
+
+  <div class="btn-group mb-2" role="group" id="categoryFilter">
+    <button type="button" class="btn btn-outline-primary active" data-category="all">All</button>
+    <button type="button" class="btn btn-outline-primary" data-category="coding">Coding</button>
+    <button type="button" class="btn btn-outline-primary" data-category="management">Management</button>
+    <button type="button" class="btn btn-outline-primary" data-category="ai">AI</button>
+  </div>
+
+  <div id="skillChips">
+    {% for sk in available_skills %}
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary me-1 mb-1 skill-chip"
+            data-skill-id="{{ sk.pk }}"
+            data-skill-name="{{ sk.name }}"
+            data-category="{{ sk.category }}">
+      + {{ sk.name }}
+    </button>
+    {% endfor %}
+  </div>
+  <p id="noSkillMatch" class="text-muted mt-2" style="display:none;">
+    No skills found.
+  </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  // Always read the up-to-date CSRF token from the cookie:
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      for (let cookie of document.cookie.split(';')) {
+        cookie = cookie.trim();
+        if (cookie.startsWith(name + '=')) {
+          cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const CSRF = getCookie('csrftoken');
+
+  // 1) Filter chips by search/category
+  function filterChips(){
+    const q   = document.getElementById('skillSearch').value.toLowerCase(),
+          cat = document.querySelector('#categoryFilter .active').dataset.category;
+    let found = false;
+    document.querySelectorAll('.skill-chip').forEach(btn => {
+      const ok = (cat==='all' || btn.dataset.category===cat)
+                 && btn.dataset.skillName.toLowerCase().includes(q);
+      btn.style.display = ok ? 'inline-block' : 'none';
+      if(ok) found = true;
+    });
+    document.getElementById('noSkillMatch').style.display = found ? 'none' : '';
+  }
+  document.getElementById('skillSearch').addEventListener('input', filterChips);
+  document.querySelectorAll('#categoryFilter button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#categoryFilter button')
+              .forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      filterChips();
+    });
+  });
+
+  // 2) Add a skill
+  function onChipClick(e){
+    const btn = e.currentTarget, sid = btn.dataset.skillId;
+    fetch("{% url 'accounts:add_skill' %}", {
+      method:'POST', credentials:'same-origin',
+      headers:{
+        'Content-Type':'application/x-www-form-urlencoded',
+        'X-CSRFToken': CSRF
+      },
+      body: new URLSearchParams({ add_skill_id: sid })
+    })
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data.pk) return console.error(data);
+      const tr = document.createElement('tr');
+      tr.dataset.pk = data.pk;
+      let html = `<td>${data.skill_name}</td><td>`;
+      for(let code in data.proficiency_vals){
+        html += `<label class="me-2">
+          <input type="radio" name="prof_${data.pk}" value="${code}"
+            ${code===data.current_prof?'checked':''}>
+          ${data.proficiency_vals[code]}
+        </label>`;
+      }
+      html += `</td><td>
+        <button class="btn btn-sm btn-outline-danger remove-btn"
+                data-category="${btn.dataset.category}">×</button>
+      </td>`;
+      tr.innerHTML = html;
+      attachRowHandlers(tr);
+      document.getElementById('current-skills-body').appendChild(tr);
+      btn.remove();
+      filterChips();
+    });
+  }
+  document.querySelectorAll('.skill-chip').forEach(b => b.addEventListener('click', onChipClick));
+
+  // 3) Update & Delete handlers
+  function attachRowHandlers(tr){
+    // update proficiency
+    tr.querySelectorAll('input[type=radio]').forEach(radio => {
+      radio.addEventListener('change', ()=>{
+        fetch("{% url 'accounts:update_skill' %}", {
+          method:'POST', credentials:'same-origin',
+          headers:{
+            'Content-Type':'application/x-www-form-urlencoded',
+            'X-CSRFToken': CSRF
+          },
+          body: new URLSearchParams({
+            pk: tr.dataset.pk,
+            proficiency: radio.value
+          })
+        });
+      });
+    });
+    // remove skill
+    tr.querySelector('.remove-btn').addEventListener('click', ()=>{
+      const pk   = tr.dataset.pk,
+            name = tr.children[0].textContent,
+            cat  = tr.querySelector('.remove-btn').dataset.category;
+      fetch("{% url 'accounts:delete_skill' %}", {
+        method:'POST', credentials:'same-origin',
+        headers:{
+          'Content-Type':'application/x-www-form-urlencoded',
+          'X-CSRFToken': CSRF
+        },
+        body: new URLSearchParams({ pk: pk })
+      })
+      .then(_=>{
+        // recreate chip
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'btn btn-sm btn-outline-secondary me-1 mb-1 skill-chip';
+        chip.dataset.skillId   = pk;
+        chip.dataset.skillName = name;
+        chip.dataset.category  = cat;
+        chip.textContent       = `+ ${name}`;
+        chip.addEventListener('click', onChipClick);
+        document.getElementById('skillChips').appendChild(chip);
+        tr.remove();
+        filterChips();
+      });
+    });
+  }
+  document.querySelectorAll('#current-skills-body tr').forEach(attachRowHandlers);
+
+  // 4) Bulk save with localStorage fallback
+  document.getElementById('save-all-skills').addEventListener('click', ()=>{
+    const rows = document.querySelectorAll('#current-skills-body tr[data-pk]');
+    const payload = {};
+    rows.forEach(r=>{
+      const pk   = r.dataset.pk;
+      const prof = r.querySelector('input[type=radio]:checked').value;
+      payload[pk] = prof;
+    });
+    fetch("{% url 'accounts:bulk_save_skills' %}", {
+      method:'POST', credentials:'same-origin',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CSRFToken': CSRF
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(_=>{
+      localStorage.setItem('savedSkills', JSON.stringify(payload));
+      alert('All skills saved!');
+    });
+  });
+
+  // 5) Restore on Back-button
+  const saved = localStorage.getItem('savedSkills');
+  if(saved){
+    const data = JSON.parse(saved);
+    Object.entries(data).forEach(([pk, prof])=>{
+      const row = document.querySelector(`#current-skills-body tr[data-pk="${pk}"]`);
+      if(row){
+        const input = row.querySelector(`input[value="${prof}"]`);
+        if(input) input.checked = true;
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,314 @@
+{% extends "accounts/base_admin.html" %}
+
+{% block title %}Step 2: Skills{% endblock %}
+{% block navbar_title %}Step 2 of 3 — Skills{% endblock %}
+
+{% block content %}
+  <h4 class="mb-3">{{ position.title }}</h4>
+
+  <form method="post" class="mb-4">{% csrf_token %}
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Skill</th>
+          <th>Required Proficiency</th>
+          <th>Importance (1–5)</th>
+          <th>Weight (normalized %)</th>
+          <th>Remove</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for req in position.requirements.all %}
+        <tr data-req-row="{{ req.pk }}">
+          <td>{{ req.skill.name }}</td>
+          <td>
+            {% for code,label in req.PROFICIENCY_CHOICES %}
+              <label class="me-2">
+                <input type="radio"
+                       name="prof_{{ req.pk }}"
+                       value="{{ code }}"
+                       {% if code == 'low' and req.level_pct == 40 or code == 'medium' and req.level_pct == 75 or code == 'high' and req.level_pct == 100 %}checked{% endif %}>
+                {{ label }}
+              </label>
+            {% endfor %}
+          </td>
+          <td>
+            <input type="range"
+                   name="importance_{{ req.pk }}"
+                   min="1" max="5"
+                   value="{{ req.importance|default:3 }}"
+                   class="importance-slider"
+                   data-req="{{ req.pk }}">
+            <span id="imp_label_{{ req.pk }}">{{ req.importance|default:3 }}</span>
+          </td>
+          <td><span id="weight_{{ req.pk }}">–</span>%</td>
+          <td>
+            <button type="button"
+                    class="btn btn-sm btn-outline-danger remove-btn"
+                    data-req="{{ req.pk }}"
+                    data-category="{{ req.skill.category }}">
+              ×
+            </button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><em>No skills yet.</em></td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3"></td>
+          <td class="fw-bold">100%</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <button type="submit" class="btn btn-primary">Next: Review ➔</button>
+  </form>
+
+  <hr>
+
+  <!-- Search + Category Filter + Chips -->
+  <div class="mb-4">
+    <label for="skillSearch" class="form-label">🔍 Search Skills:</label>
+    <input type="text" id="skillSearch" class="form-control mb-2" placeholder="Start typing…">
+
+    <div class="btn-group mb-2" role="group" id="categoryFilter">
+      <button type="button" class="btn btn-outline-primary active" data-category="all">All</button>
+      <button type="button" class="btn btn-outline-primary" data-category="coding">Coding</button>
+      <button type="button" class="btn btn-outline-primary" data-category="management">Management</button>
+      <button type="button" class="btn btn-outline-primary" data-category="ai">AI</button>
+    </div>
+
+    <div id="skillChips">
+      {% for sk in available_skills %}
+      <button type="button"
+              class="btn btn-sm btn-outline-secondary me-1 mb-1 skill-chip"
+              data-skill-id="{{ sk.pk }}"
+              data-skill-name="{{ sk.name }}"
+              data-category="{{ sk.category }}">
+        + {{ sk.name }} ({{ sk.get_category_display }})
+      </button>
+      {% endfor %}
+    </div>
+    <p id="noSkillMatch" class="text-muted mt-2" style="display:none;">
+      No skills found.
+    </p>
+  </div>
+
+  <p>
+    <a href="#" data-bs-toggle="modal" data-bs-target="#skillModal">
+      + Create New Skill
+    </a>
+  </p>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+
+  // 1️⃣ Normalize weights
+  function recalc() {
+    const sliders = Array.from(document.querySelectorAll('.importance-slider'))
+                         .filter(s => !!s.closest('tr[data-req-row]'));
+    let total = 0, raw = {};
+    sliders.forEach(s => { raw[s.dataset.req] = +s.value; total += +s.value; });
+    sliders.forEach(s => {
+      const id = s.dataset.req,
+            w  = total ? raw[id]/total*100 : 0;
+      document.getElementById(`imp_label_${id}`).textContent = raw[id];
+      document.getElementById(`weight_${id}`).textContent    = w.toFixed(1);
+    });
+  }
+  document.addEventListener('input',  e => { if (e.target.matches('.importance-slider')) recalc(); });
+  document.addEventListener('change', e => { if (e.target.matches('input[type=radio]')) recalc(); });
+  recalc();
+
+  // 2️⃣ Live-search & category-filter
+  function filterChips() {
+    const q   = document.getElementById('skillSearch').value.toLowerCase(),
+          cat = document.querySelector('#categoryFilter .active').dataset.category;
+    let found = false;
+    document.querySelectorAll('.skill-chip').forEach(btn => {
+      const ok = (cat==='all' || btn.dataset.category===cat)
+                 && btn.dataset.skillName.toLowerCase().includes(q);
+      btn.style.display = ok ? 'inline-block' : 'none';
+      if (ok) found = true;
+    });
+    document.getElementById('noSkillMatch').style.display = found ? 'none' : '';
+  }
+  const searchInput = document.getElementById('skillSearch');
+  if (searchInput) searchInput.addEventListener('input', filterChips);
+  document.querySelectorAll('#categoryFilter button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('#categoryFilter button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      filterChips();
+    });
+  });
+
+  // 3️⃣ AJAX “add existing skill”
+  function onChipClick(e) {
+    const btn  = e.currentTarget,
+          id   = btn.dataset.skillId,
+          csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    if (!csrf) return;
+    fetch("", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": csrf
+      },
+      body: new URLSearchParams({ add_skill_id: id })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.pk) return console.error("Add failed", data);
+      const tbody = document.querySelector("tbody"),
+            tr    = document.createElement("tr");
+      tr.dataset.reqRow = data.pk;
+
+      let profHtml = "";
+      for (let code in data.proficiency_vals) {
+        profHtml +=
+          `<label class="me-2">
+             <input type="radio"
+                    name="prof_${data.pk}"
+                    value="${code}"
+                    ${code===data.current_prof?"checked":""}>
+             ${data.proficiency_vals[code]}
+           </label>`;
+      }
+
+      tr.innerHTML = `
+        <td>${data.skill_name}</td>
+        <td>${profHtml}</td>
+        <td>
+          <input type="range"
+                 name="importance_${data.pk}"
+                 min="1" max="5"
+                 value="${data.importance}"
+                 class="importance-slider"
+                 data-req="${data.pk}">
+          <span id="imp_label_${data.pk}">${data.importance}</span>
+        </td>
+        <td><span id="weight_${data.pk}">–</span>%</td>
+        <td>
+          <button type="button"
+                  class="btn btn-sm btn-outline-danger remove-btn"
+                  data-req="${data.pk}"
+                  data-category="${btn.dataset.category}">
+            ×
+          </button>
+        </td>`;
+      tbody.appendChild(tr);
+      recalc();
+      tr.querySelector('.remove-btn').addEventListener('click', onRemove);
+      btn.remove();
+    })
+    .catch(console.error);
+  }
+  document.querySelectorAll('.skill-chip').forEach(b => b.addEventListener('click', onChipClick));
+
+  // 4️⃣ Remove-row
+  function onRemove(e) {
+    const btn  = e.currentTarget,
+          pk   = btn.dataset.req,
+          tr   = document.querySelector(`tr[data-req-row="${pk}"]`),
+          name = tr?.children[0].textContent,
+          cat  = btn.dataset.category,
+          csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    if (!tr || !csrf) return;
+    fetch("", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": csrf
+      },
+      body: new URLSearchParams({ [`delete_${pk}`]: "on" })
+    })
+    .then(_ => {
+      tr.remove(); recalc();
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "btn btn-sm btn-outline-secondary me-1 mb-1 skill-chip";
+      chip.dataset.skillId   = pk;
+      chip.dataset.skillName = name;
+      chip.dataset.category  = cat;
+      chip.textContent       = `+ ${name}`;
+      chip.addEventListener('click', onChipClick);
+      document.getElementById("skillChips").appendChild(chip);
+    })
+    .catch(console.error);
+  }
+  document.querySelectorAll('.remove-btn').forEach(b => b.addEventListener('click', onRemove));
+
+  // 5️⃣ AJAX “create new skill”
+  const skillForm = document.getElementById('skillForm');
+  if (skillForm) {
+    skillForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const data = new FormData(this),
+            resp = await fetch(this.action, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: {'X-Requested-With': 'XMLHttpRequest'},
+              body: data
+            });
+      if (!resp.ok) {
+        console.error('Skill creation failed', await resp.text());
+        return;
+      }
+      const {id,name,category} = await resp.json(),
+            chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'btn btn-sm btn-outline-secondary me-1 mb-1 skill-chip';
+      chip.dataset.skillId   = id;
+      chip.dataset.skillName = name;
+      chip.dataset.category  = category;
+      chip.textContent       = `+ ${name} (${category.charAt(0).toUpperCase()+category.slice(1)})`;
+      chip.addEventListener('click', onChipClick);
+      document.getElementById('skillChips').appendChild(chip);
+
+      // hide and reset modal
+      const modalEl = this.closest('.modal');
+      bootstrap.Modal.getInstance(modalEl).hide();
+      this.reset();
+    });
+  }
+
+}); // end DOMContentLoaded
+</script>
+
+<!-- Create New Skill Modal -->
+<div class="modal fade" id="skillModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form id="skillForm" method="post" action="{% url 'positions:create_skill' %}">
+      {% csrf_token %}
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">🆕 Create New Skill</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {{ skill_form.non_field_errors }}
+          <div class="mb-3">
+            {{ skill_form.name.label_tag }} {{ skill_form.name }}
+          </div>
+          <div class="mb-3">
+            {{ skill_form.category.label_tag }} {{ skill_form.category }}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Skill</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

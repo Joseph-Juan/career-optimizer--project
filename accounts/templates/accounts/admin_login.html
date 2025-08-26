@@ -1,0 +1,22 @@
+{% extends "base_auth.html" %}
+{% block title %}Admin Login{% endblock %}
+{% block header %}Admin Sign In{% endblock %}
+
+{% block content %}
+  <form method="post" action="{% url 'accounts:admin_login' %}">
+    {% csrf_token %}
+    {% if error_message %}
+      <div class="alert alert-danger">{{ error_message }}</div>
+    {% endif %}
+    <!-- your username & password fields here -->
+    <div class="mb-3">
+      <label for="id_username">Username or Email</label>
+      <input type="text" name="username" id="id_username" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label for="id_password">Password</label>
+      <input type="password" name="password" id="id_password" class="form-control" required>
+    </div>
+    <button class="btn btn-primary w-100">Log In</button>
+  </form>
+{% endblock %}

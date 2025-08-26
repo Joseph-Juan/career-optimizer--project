@@ -1,0 +1,15 @@
+﻿#position_confirm_delete.html
+
+{% extends "accounts/base_admin.html" %}
+{% block title %}Delete Position{% endblock %}
+{% block navbar_title %}Delete Position{% endblock %}
+
+{% block content %}
+  <h4>Delete Position</h4>
+  <p>Are you sure you want to delete “{{ object.title }} at {{ object.company }}”?</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Yes, delete</button>
+    <a href="{% url 'positions:list' %}" class="btn btn-secondary">Cancel</a>
+  </form>
+{% endblock %}

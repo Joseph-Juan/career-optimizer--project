@@ -1,0 +1,36 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Student Login{% endblock %}
+{% block header %}Student Sign In{% endblock %}
+
+{% block content %}
+  <form method="post" action="{% url 'accounts:student_login' %}">
+    {% csrf_token %}
+    {% if error_message %}
+      <div class="alert alert-danger">{{ error_message }}</div>
+    {% endif %}
+    <div class="mb-3">
+      <label for="id_username" class="form-label">Username or Email</label>
+      <input type="text"
+             name="username"
+             id="id_username"
+             class="form-control"
+             value="{{ request.POST.username }}"
+             required>
+    </div>
+    <div class="mb-3">
+      <label for="id_password" class="form-label">Password</label>
+      <input type="password"
+             name="password"
+             id="id_password"
+             class="form-control"
+             required>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Log In</button>
+  </form>
+
+  <p class="text-center mt-3">
+    Don’t have an account?
+    <a href="{% url 'accounts:student_register' %}">Register here</a>.
+  </p>
+{% endblock %}

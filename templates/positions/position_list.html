@@ -1,0 +1,87 @@
+{% extends "accounts/base_admin.html" %}
+{% load static %}
+
+{% block title %}Manage Positions{% endblock %}
+{% block navbar_title %}Positions{% endblock %}
+
+{% block content %}
+  <div class="mb-4">
+    <a href="{% url 'positions:new' %}" class="btn btn-success">
+      + Create New Position
+    </a>
+  </div>
+
+  <div class="btn-group mb-3" role="group" aria-label="Status filter">
+    <a
+      href="{% url 'positions:list' %}"
+      class="btn {% if not current_status %}btn-primary{% else %}btn-outline-primary{% endif %}"
+    >
+      All
+    </a>
+    {% for code,label in status_choices %}
+      <a
+        href="{% url 'positions:list' %}?status={{ code }}"
+        class="btn {% if code == current_status %}btn-primary{% else %}btn-outline-primary{% endif %}"
+      >
+        {{ label }}
+      </a>
+    {% endfor %}
+  </div>
+
+  {% if positions %}
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Company</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pos in positions %}
+          <tr>
+            <td>{{ pos.title }}</td>
+            <td>{{ pos.company }}</td>
+            <td>{{ pos.get_status_display }}</td>
+            <td>
+              <div class="btn-group" role="group">
+                <a href="{% url 'positions:edit' pos.pk %}"
+                   class="btn btn-sm btn-outline-secondary">
+                  ✎ Edit
+                </a>
+                <form method="post" action="{% url 'positions:status' pos.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="status" value="draft">
+                  <button type="submit" class="btn btn-sm btn-outline-warning">
+                    Draft
+                  </button>
+                </form>
+                <form method="post" action="{% url 'positions:status' pos.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="status" value="posted">
+                  <button type="submit" class="btn btn-sm btn-outline-success">
+                    Post
+                  </button>
+                </form>
+                <form method="post" action="{% url 'positions:status' pos.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="status" value="retracted">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    Retract
+                  </button>
+                </form>
+                <a href="{% url 'positions:delete' pos.pk %}"
+                   class="btn btn-sm btn-outline-dark">
+                  🗑
+                </a>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No positions found.</p>
+  {% endif %}
+{% endblock %}

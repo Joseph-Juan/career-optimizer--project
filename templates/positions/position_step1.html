@@ -1,0 +1,31 @@
+{% extends "accounts/base_admin.html" %}
+{% block title %}Step 1: Position Details{% endblock %}
+{% block navbar_title %}Step 1: Position{% endblock %}
+
+{% block content %}
+  <h4>{{ form.instance.pk|yesno:"Edit,New" }} Position — Step 1 of 3</h4>
+  <form method="post">{% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="mb-3">
+      {{ form.title.label_tag }}
+      {{ form.title }}
+    </div>
+    <div class="mb-3">
+      {{ form.company.label_tag }}
+      {{ form.company }}
+    </div>
+    <div class="mb-3">
+      {{ form.description.label_tag }}
+      {{ form.description }}
+    </div>
+    <div class="mb-3">
+      {{ form.status.label_tag }}
+      {{ form.status }}
+    </div>
+    <div class="mb-3">
+      {{ form.tags.label_tag }}
+      {{ form.tags }}
+    </div>
+    <button type="submit" class="btn btn-primary">Next: Add Skills ➔</button>
+  </form>
+{% endblock %}

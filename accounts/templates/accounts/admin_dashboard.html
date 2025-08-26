@@ -1,0 +1,25 @@
+{% extends "accounts/base_admin.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+  <div class="text-center">
+    <h1>Welcome, {{ request.user.get_full_name }}!</h1>
+    <p class="mb-4">Use the links below to manage positions.</p>
+
+    <div class="d-grid gap-3">
+          <a href="{% url 'positions:new' %}" class="btn btn-success btn-lg">
+    + Create New Position
+  </a>
+
+
+      <a href="{% url 'positions:list' %}" class="btn btn-primary btn-lg">
+        Manage Existing Positions
+      </a>
+      <a href="{% url 'accounts:admin_matches' %}" class="btn btn-info btn-lg">
+        View Student Matches
+      </a>
+      <a href="{% url 'accounts:admin_logout' %}" class="btn btn-secondary btn-lg">
+        Logout
+      </a>
+    </div>
+  </div>
+{% endblock %}
