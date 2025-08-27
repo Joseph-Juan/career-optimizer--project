@@ -1,118 +1,184 @@
-Career Optimizer — Developer Guide (clean, accurate, step-by-step)
-Purpose
+# Career Optimizer — Developer Guide
 
-This document explains how to get the project running locally, where the important files live, and how the core parts work. It is intended for the developer who will pick up coding and maintenance. All descriptions reflect the current code in the repository you supplied.
+**Purpose**  
+This document explains how to get the project running locally, where the important files live, and how the core parts work. It is written step-by-step so a developer (or a student developer) can follow, inspect, and extend the application safely.
 
-Table of contents
+---
 
-Quick start (fastest)
+## Introduction - how the project works (high level)
 
-Full setup (step-by-step)
+Career Optimizer is a Django web application that helps students record skills and proficiencies, compare their skills to position requirements, save positions, and generate a CV.
 
-Repository map (exact files & folders)
+At runtime the application follows a simple request → process → response flow:
 
-Key configuration to check (settings.py)
+1. A user (student or admin) interacts with the browser UI (clicks, submits a form, requests a page)
+2. The browser sends an HTTP request to the Django application
+3. Django routing (`careerpath/urls.py` → app `urls.py`) dispatches the request to a view
+4. The view uses the Django ORM to read or update models in the database (`db.sqlite3` in development)
+5. The view prepares a context and renders an HTML template (or returns JSON for AJAX endpoints)
+6. The template combined with CSS/JS produces the final UI shown in the browser
 
-Database (where it lives, how it works, how to inspect)
+The project stores application data in models such as `User`, `StudentProfile`, `StudentSkill`, `Skill`, `Position`, and `PositionSkillRequirement`. The key business feature - matching a student to a Position - is computed from saved student skills and the position's skill requirements and importance weights.
 
-Models (concise, file-by-file)
+---
 
-Views, URLs, Templates — data flow (step-by-step example)
+## Flow diagrams
 
-Match scoring — exact behaviour (from code)
+### Mermaid flowchart (works on GitHub when Mermaid is enabled)
 
-Styling & static files (how CSS is applied)
+```mermaid
+flowchart TD
+    A[Browser: user action] --> B[Project URL Router<br/>careerpath/urls.py]
+    B --> C[App URL Router<br/>accounts/urls.py or positions/urls.py]
+    C --> D[View<br/>accounts/views.py or positions/views.py]
+    D --> E[ORM queries/updates]
+    E --> F[Database<br/>db.sqlite3]
+    D --> G[Render template or return JSON]
+    G --> H[Template + CSS + JS]
+    H --> I[Browser displays page]
+```
 
-Admin, shell & common commands
+> If Mermaid diagrams are not supported in the viewing environment, use the ASCII fallback below.
 
-Troubleshooting (common problems & fixes)
+### ASCII fallback (plain text)
 
-Handover checklist & recommended first tasks
+```
+[Browser: user action]
+        |
+        v
+[careerpath/urls.py] --> [accounts/urls.py or positions/urls.py]
+        |
+        v
+[view: accounts/views.py or positions/views.py]
+        |
+        v
+[ORM] <--> [db.sqlite3]
+        |
+        v
+[render(template) or JsonResponse]
+        |
+        v
+[HTML + CSS + JS sent to Browser]
+```
 
-1 — Quick start (fastest; assumes you provide db.sqlite3)
+---
 
-If you give the incoming developer the repository with requirements.txt and db.sqlite3, these commands are sufficient to run the site locally (Windows):
+## Table of contents
 
+- [Quick start (fastest)](#quick-start-fastest)
+- [Full setup (step-by-step)](#full-setup-step-by-step)
+- [Repository map (exact top-level items)](#repository-map-exact-top-level-items)
+- [Key configuration to check (careerpath/settings.py)](#key-configuration-to-check-careerpathsettingspy)
+- [Database - where it lives and how it behaves](#database---where-it-lives-and-how-it-behaves)
+- [Models - concise, accurate, file-by-file](#models---concise-accurate-file-by-file)
+- [Views, URLs, Templates - how a page is produced (step-by-step)](#views-urls-templates---how-a-page-is-produced-step-by-step)
+- [Match scoring - exact behaviour (from code)](#match-scoring---exact-behaviour-from-code)
+- [Styling & static files - how CSS is applied](#styling--static-files---how-css-is-applied)
+- [Admin, shell & commonly used commands](#admin-shell--commonly-used-commands)
+- [Troubleshooting - common problems & fixes](#troubleshooting---common-problems--fixes)
+- [Handover checklist & recommended first tasks](#handover-checklist--recommended-first-tasks)
+
+---
+
+## Quick start (fastest)
+
+> Use this only if you provide `requirements.txt` and `db.sqlite3` to the incoming developer. This gets a working local instance up quickly.
+
+**Windows (PowerShell)**
+```powershell
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 python manage.py runserver
+```
 
-
-mac / linux:
-
+**mac/Linux**
+```bash
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python manage.py runserver
+```
 
+Open in browser:
+- http://127.0.0.1:8000
+- http://127.0.0.1:8000/admin
 
-Open the app:
-
-http://127.0.0.1:8000
-http://127.0.0.1:8000/admin
-
-
-If db.sqlite3 is not provided, run migrations before runserver:
-
+If `db.sqlite3` is **not** provided, run migrations before starting the server:
+```bash
 python manage.py migrate
+```
 
-
-To create an admin user:
-
+To create an admin account:
+```bash
 python manage.py createsuperuser
+```
 
-2 — Full setup (step-by-step)
+---
 
-If the new developer needs the full onboarding (create venv, install, migrations), use this:
+## Full setup (step-by-step)
 
-Clone repo and change directory:
+Follow this when `db.sqlite3` is not supplied or to reproduce the environment from scratch.
 
-git clone <repo-url>
-cd career-optimizer--project
+1. **Clone repo and enter directory**
+   ```bash
+   git clone <repo-url>
+   cd career-optimizer--project
+   ```
 
+2. **Create and activate virtual environment**
+   
+   Windows PowerShell:
+   ```powershell
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
+   ```
+   
+   mac/Linux:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   ```
 
-Create and activate virtual environment (Windows PowerShell):
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-python -m venv venv
-& .\venv\Scripts\Activate.ps1
+4. **Inspect and optionally update settings** (see the next section on details)
+   
+   If you want a project-level `static/` folder discovered during development add to `settings.py`:
+   ```python
+   STATICFILES_DIRS = [BASE_DIR / "static"]
+   ```
 
+5. **Create and apply migrations**
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
 
-mac / linux:
+6. **Create a superuser (optional)**
+   ```bash
+   python manage.py createsuperuser
+   ```
 
-python -m venv venv
-source venv/bin/activate
+7. **Start the development server**
+   ```bash
+   python manage.py runserver
+   ```
 
+8. **Verify in browser**
+   - http://127.0.0.1:8000
+   - http://127.0.0.1:8000/admin
 
-Install dependencies:
+---
 
-pip install -r requirements.txt
+## Repository map (exact top-level items)
 
+Top-level items present in the repository snapshot:
 
-Confirm settings in careerpath/settings.py (see section 4). If a project-level static/ folder exists, consider adding:
-
-STATICFILES_DIRS = [ BASE_DIR / "static" ]
-
-
-Apply migrations (if you did not include db.sqlite3):
-
-python manage.py makemigrations
-python manage.py migrate
-
-
-Create superuser (optional):
-
-python manage.py createsuperuser
-
-
-Run server:
-
-python manage.py runserver
-
-3 — Repository map (exact top-level items)
-
-These are the items actually present in the zip you provided (top-level):
-
+```
 .venv
 .vscode
 accounts
@@ -128,364 +194,365 @@ manage.py
 README.md
 requirements.txt
 structure.txt
+```
 
+**Notes**
+- `.venv` and `venv` are virtual environment directories (should be ignored by Git)
+- `db.sqlite3` and `db.sqlite3.bak` are database files
+- `templates/` contains base templates (`base.html`, `base_auth.html`, `landing.html`)
 
-Notes:
+---
 
-.venv and venv are present in the zip — do not commit virtual environment dirs into Git. They should be in .gitignore.
+## Key configuration to check (`careerpath/settings.py`)
 
-db.sqlite3 and db.sqlite3.bak are present here. If you share the repository with others, decide whether to include db.sqlite3 or provide fixtures instead.
+Open `careerpath/settings.py` and verify these values:
 
-templates/ includes base.html, base_auth.html, and landing.html.
-
-4 — Key configuration to check (careerpath/settings.py)
-
-Open careerpath/settings.py and confirm the following values (these are present in your project):
-
-Custom user model:
-
+**Custom user model**
+```python
 AUTH_USER_MODEL = 'accounts.User'
+```
+- The project uses a custom `User` model
+- Do not change this after migrations are created/applied
 
-
-Database (development; file-based SQLite):
-
+**Database (development)**
+```python
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+```
+- Points to `db.sqlite3` in the project root
 
-
-Static URL:
-
+**Static files**
+```python
 STATIC_URL = 'static/'
+```
+- For a project-level `static/` folder, add:
+```python
+STATICFILES_DIRS = [BASE_DIR / "static"]
+```
 
+**Debug**
+- `DEBUG = True` in development
+- Set `DEBUG = False` and configure `ALLOWED_HOSTS` for production
 
-Debug mode (currently True in the repo): DEBUG = True
-For production you must set DEBUG = False and configure ALLOWED_HOSTS.
+**Security note**
+- Secure `SECRET_KEY` before deploying to production
+- Use environment variables for secrets
 
-Important notes:
+---
 
-Do not change AUTH_USER_MODEL after migrations have been created/applied. Doing so will cause migration conflicts and requires careful migration planning.
+## Database - where it lives and how it behaves
 
-If you want a central static/ folder, add STATICFILES_DIRS as needed (see Full setup step 4).
+**Location**
+- `db.sqlite3` in the project root (development database)
 
-5 — Database: where it lives and how it behaves
+**About SQLite**
+- File-based SQL database stored in a single file
+- Suitable for development and small-scale testing
+- Use PostgreSQL or similar for production
 
-Development DB: db.sqlite3 (file-based SQLite). Path: project root.
+**Inspecting data**
+- Django shell:
+  ```bash
+  python manage.py shell
+  ```
+  ```python
+  from positions.models import Position
+  Position.objects.all()[:5]
+  ```
+- SQLite CLI:
+  ```bash
+  sqlite3 db.sqlite3
+  .tables
+  ```
 
-The SQLite configuration is set in careerpath/settings.py (see above).
+**Changing data vs changing schema**
+- Change data via Django admin or ORM
+- Change schema by editing `models.py` and running:
+  ```bash
+  python manage.py makemigrations
+  python manage.py migrate
+  ```
 
-SQLite is a real SQL engine stored in a single file and is suitable for development and testing. It is not a server; for production prefer PostgreSQL or equivalent.
-
-Inspecting data
-
-Use Django shell:
-
-python manage.py shell
-
-
-then e.g.:
-
-from positions.models import Position
-Position.objects.all()[:5]
-
-
-Or use the sqlite CLI:
-
-sqlite3 db.sqlite3
-.tables
-
-
-Or use the VS Code SQLite extension to open db.sqlite3 visually.
-
-Changing data vs changing schema
-
-To change rows (data): use Django admin or the Django ORM (manage.py shell) — preferred.
-
-To change schema (models): edit models.py, then run:
-
-python manage.py makemigrations
-python manage.py migrate
-
-
-Never edit db.sqlite3 schema by hand — always use migrations.
-
-Export / import data
+**Export/import**
+```bash
 python manage.py dumpdata > dump.json
 python manage.py loaddata dump.json
-
-6 — Models (concise, accurate, file-by-file)
-
-I inspected accounts/models.py and positions/models.py. Below is a short, precise summary of the actual models present and what they represent.
-
-accounts/models.py (key classes found)
-
-User — custom user model (inherits AbstractUser). Has is_admin boolean.
-
-StudentProfile — user profile data; linked one-to-one to User.
-
-StudentSkill — links a StudentProfile to a Skill and stores proficiency (string codes like 'low', 'medium', 'high' in some places).
-
-SavedPosition — a student saved a Position. It includes a match_score method (see section 8).
-
-StudentCV — stores a student CV (one-to-one with StudentProfile), fields include full_name, email, phone, address, objective, created_at, updated_at.
-
-Language (and other CV-related models) — languages, etc., related to StudentCV.
-
-Read accounts/models.py directly for full fields — these are the main structures you will read and edit.
-
-positions/models.py (key classes found)
-
-Skill — canonical skill with name and category.
-
-Position — job posting, fields include title, company, description, tags, status, created_at, updated_at.
-
-PositionSkillRequirement — join table: links a Position to a Skill. Fields found:
-
-level_pct (named in code; help text: "Required proficiency % (0–100)")
-
-importance (PositiveSmallIntegerField default=1, help_text "Relative importance (1–5)")
-
-PROFICIENCY_CHOICES (choices like 'low', 'medium', 'high') are defined.
-
-unique_together = ('position','skill')
-
-The PositionSkillRequirement model uses both a numeric level_pct and a coded proficiency level; code uses these fields (see match scoring logic).
-
-7 — Views, URLs, Templates — how a page is produced (step-by-step)
-
-When you need to find where a page is implemented, follow this pattern:
-
-Find the URL: open careerpath/urls.py, then follow the include('accounts.urls') or include('positions.urls') to the app-level urls.py.
-
-Open the view: open the view function/class referenced by the route (in accounts/views.py or positions/views.py).
-
-Check model queries: the view will use the ORM (e.g., StudentSkill.objects.filter(student=request.user)).
-
-Find template: view calls render(request, "path/to/template.html", context). Open that template under templates/.
-
-Map data: in the template, find {{ }} or {% for %} elements and map them back to the context variable names in the view.
-
-Concrete example: “My Skills” page (how it works)
-
-accounts/urls.py includes a route for skills/ (look there).
-
-accounts/views.py implements student_skills (example name). The view:
-
-queries StudentSkill for request.user's profile,
-
-returns render(request, "accounts/skills.html", {"skills": skills}).
-
-templates/accounts/skills.html uses the skills context in a loop:
-
-{% for s in skills %}
-  {{ s.skill.name }} - {{ s.proficiency }}
-{% endfor %}
-
-
-If interactivity (AJAX) exists, locate JS under static/ or inline scripts in the template and match endpoints in views.py.
-
-8 — Match scoring — exact behaviour (taken from code)
-
-The repository contains a SavedPosition.match_score method in accounts/models.py. I inspected the method and describe its behaviour exactly:
-
-It builds a prof_map of the student's skills:
-
-prof_map = { ss.skill_id: ss.proficiency for ss in self.profile.student_skills.all() }
-
-
-where ss.proficiency is the stored code for the student skill (codes like 'low', 'medium', 'high' are used elsewhere).
-
-It gets the position requirements:
-
-reqs = self.position.requirements.all()
-
-
-It sums importance for all requirements and returns 0.0 if total importance (total weight) is zero.
-
-It defines a numeric ordering for proficiency codes:
-
-LEVEL_ORDER = {"low": 1, "medium": 2, "high": 3}
-
-
-For each requirement r, it finds:
-
-the student's level code student_lvl = prof_map.get(r.skill_id)
-
-the required level req_lvl = r.required_proficiency_code if hasattr(r, 'required_proficiency_code') else r.level_pct
-
-(Implementation note: the code checks for required_proficiency_code field; otherwise it falls back to level_pct. Because the repository contains both representations, the method is tolerant.)
-
-It increases matched by r.importance when the student's level code is greater than or equal to the required level code using LEVEL_ORDER:
-
-if student_lvl and LEVEL_ORDER.get(student_lvl,0) >= LEVEL_ORDER.get(req_lvl, 0):
-    matched += r.importance
-
-
-Final score returned:
-
-return 100.0 * matched / total_weight
-
-
-Summary (behavioural):
-
-The algorithm counts how many requirement importances the student meets at or above the required level (using 'low' < 'medium' < 'high' ordering), sums importance of satisfied requirements, and computes a percentage of the total importance. Missing student skill => not matched (student_lvl is None => not counted).
-
-What to confirm when changing scoring:
-
-Which field is canonical: required_proficiency_code (string codes) or level_pct (percentage)? The code supports both; choose one representation and make the logic consistent.
-
-Decide how to treat numeric level_pct (if you switch to percent-based matching, you'll likely change the algorithm to compare numeric values instead of codes).
-
-Decide treatment of missing student skills (current code treats missing as not meeting requirement).
-
-9 — Styling and static assets (how CSS is applied right now)
-
-templates/base.html loads Bootstrap 5 from a CDN:
-
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-
-The repository does not include a static/css/style.css by default in the files I inspected. If you add project-specific CSS, place it in static/css/style.css and add this to the base template after the Bootstrap link:
-
-<link rel="stylesheet" href="{% static 'css/style.css' %}">
-
-
-To make sure Django will serve project-level static assets during development, set (if not present):
-
-STATICFILES_DIRS = [ BASE_DIR / "static" ]
-
-
-in careerpath/settings.py.
-
-The project uses CSS classes for proficiency (search for .prof-high, .prof-medium, etc. in templates or a CSS file). If you implement the color coding, put these definitions in static/css/style.css.
-
-10 — Admin, shell & commonly used commands
-
-Useful commands you will use often:
-
-Create and activate venv:
-
+```
+
+---
+
+## Models - concise, accurate, file-by-file
+
+### `accounts/models.py` (key classes)
+- **`User`** - custom user model (`AUTH_USER_MODEL`)
+- **`StudentProfile`** - one-to-one profile for a `User`
+- **`StudentSkill`** - links `StudentProfile` to `Skill` with proficiency levels
+- **`SavedPosition`** - saved position for a student with `match_score` method
+- **`StudentCV`** - CV-related fields and sections
+
+### `positions/models.py` (key classes)
+- **`Skill`** - canonical skill entry
+- **`Position`** - job posting
+- **`PositionSkillRequirement`** - links `Position` and `Skill` with requirements
+
+**Relationships**
+- `PositionSkillRequirement.position` → `Position` (ForeignKey)
+- `PositionSkillRequirement.skill` → `Skill` (ForeignKey)
+- `StudentSkill.student` → `StudentProfile` (ForeignKey)
+- `StudentSkill.skill` → `Skill` (ForeignKey)
+
+**When you change a model**
+1. Edit the model in `models.py`
+2. Run:
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
+
+---
+
+## Views, URLs, Templates - how a page is produced (step-by-step)
+
+To understand or modify a page:
+
+1. **Find the route** in `careerpath/urls.py` → app `urls.py`
+2. **Open the view** in `accounts/views.py` or `positions/views.py`
+3. **Check model queries** (ORM calls like `.filter`, `.get`, `.select_related`)
+4. **Find the render call** and note context keys
+5. **Open the template** and map variables/tags to context
+6. **For AJAX**, find JavaScript and match endpoints to `JsonResponse` views
+
+### Example - "My Skills" page
+- **Route**: `skills/` in `accounts/urls.py`
+- **View**:
+  ```python
+  skills = StudentSkill.objects.filter(student=request.user).select_related('skill')
+  return render(request, "accounts/skills.html", {"skills": skills})
+  ```
+- **Template**: `templates/accounts/skills.html`
+  ```django
+  {% for s in skills %}
+    {{ s.skill.name }} - {{ s.proficiency }}
+  {% endfor %}
+  ```
+
+---
+
+## Match scoring - exact behaviour (from code)
+
+The `SavedPosition.match_score` method computes student-position compatibility:
+
+1. **Build student proficiency map**
+   ```python
+   prof_map = {ss.skill_id: ss.proficiency for ss in self.profile.student_skills.all()}
+   ```
+
+2. **Fetch position requirements**
+   ```python
+   reqs = self.position.requirements.all()
+   ```
+
+3. **Sum importance** for all requirements (return 0.0 if total is zero)
+
+4. **Define level order**
+   ```python
+   LEVEL_ORDER = {"low": 1, "medium": 2, "high": 3}
+   ```
+
+5. **For each requirement**:
+   - Get student level: `student_lvl = prof_map.get(r.skill_id)`
+   - Get required level: `req_lvl = r.required_proficiency_code or r.level_pct`
+   - If student meets requirement: `matched += r.importance`
+
+6. **Calculate final percentage**
+   ```python
+   score = 100.0 * matched / total_weight
+   ```
+
+**Behavior summary**
+- Counts importance of met requirements
+- Missing skills treated as not meeting requirement
+- Supports both coded levels and numeric fallback
+
+**Before changing scoring**
+- Decide on canonical representation (coded levels or numeric)
+- Update tests and templates accordingly
+
+**Example numeric approach**
+```python
+def calculate_numeric_match(position, student):
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for req in position.requirements.all().select_related('skill'):
+        w = float(req.level_pct_weight or req.importance or 1)
+        total_weight += w
+        student_prof = student.studentskill_set.filter(skill=req.skill).first()
+        student_val = getattr(student_prof, 'level_pct', 0) if student_prof else 0
+        if req.level_pct <= 0:
+            match = 1.0
+        else:
+            match = min(student_val / req.level_pct, 1.0)
+        weighted_sum += match * w
+    return (weighted_sum / total_weight) * 100 if total_weight else 0.0
+```
+
+---
+
+## Styling & static files - how CSS is applied
+
+**Bootstrap**
+- Loaded from CDN in base template:
+  ```html
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  ```
+
+**Project CSS**
+- Add custom CSS at: `static/css/style.css`
+- Include in base template:
+  ```django
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  ```
+
+**Static files configuration**
+- Ensure in settings:
+  ```python
+  STATIC_URL = 'static/'
+  ```
+- For project-level static files:
+  ```python
+  STATICFILES_DIRS = [BASE_DIR / "static"]
+  ```
+
+**Proficiency color coding**
+- Add to `static/css/style.css`:
+  ```css
+  .prof-none { color: #ccc; }
+  .prof-low { color: #d9534f; }
+  .prof-medium { color: #f0ad4e; }
+  .prof-high { color: #5cb85c; }
+  ```
+
+---
+
+## Admin, shell & commonly used commands
+
+**Virtual environment**
+```bash
 python -m venv venv
+```
 
+**Activate (Windows PowerShell)**
+```powershell
+.\venv\Scripts\Activate.ps1
+```
 
-Activate (Windows PowerShell):
-
-& .\venv\Scripts\Activate.ps1
-
-
-Activate (mac / linux):
-
+**Activate (mac/Linux)**
+```bash
 source venv/bin/activate
+```
 
-
-Install dependencies:
-
+**Install requirements**
+```bash
 pip install -r requirements.txt
+```
 
-
-Migrations:
-
+**Migrations**
+```bash
 python manage.py makemigrations
 python manage.py migrate
+```
 
-
-Create superuser:
-
+**Create superuser**
+```bash
 python manage.py createsuperuser
+```
 
-
-Run server:
-
+**Run server**
+```bash
 python manage.py runserver
+```
 
-
-Open Django shell:
-
+**Django shell**
+```bash
 python manage.py shell
+```
 
-
-Run tests:
-
+**Run tests**
+```bash
 python manage.py test
+```
 
-
-Dump / load data:
-
+**Data dump/load**
+```bash
 python manage.py dumpdata > dump.json
 python manage.py loaddata dump.json
+```
 
-11 — Troubleshooting: common problems & fixes (concise)
+---
 
-PowerShell blocks activation
+## Troubleshooting - common problems & fixes
 
+**PowerShell execution policy**
+```powershell
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
 
-
-requirements.txt missing / pip install fails
-Install core packages manually:
-
+**Missing requirements.txt**
+```bash
 pip install django django-crispy-forms widget-tweaks
+```
 
-
-Migration errors after changing AUTH_USER_MODEL
-If AUTH_USER_MODEL was altered after migrations exist, do not attempt to fix lightly. If you can discard dev data, reset migrations and DB:
-
+**Migrations/AUTH_USER_MODEL issues**
+```bash
+# Destructive reset (use with caution):
 rm db.sqlite3
 find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
 python manage.py makemigrations
 python manage.py migrate
+```
 
+**Static files 404**
+- Ensure templates use `{% load static %}`
+- Reference files with `{% static 'path' %}`
 
-(Windows: remove with Explorer or del / rmdir as appropriate.)
+**AJAX 403 (CSRF)**
+- Include CSRF token in `X-CSRFToken` header
 
-Static files 404
-Ensure STATICFILES_DIRS is set if you use a project-level static/ and that templates include {% load static %}.
+**Template syntax errors**
+- Use spaces in comparisons: `{% if a == b %}`
 
-AJAX 403 (CSRF)
-Include CSRF token in headers for AJAX requests: send X-CSRFToken header with the token.
+**N+1 query performance**
+- Use `select_related()` and `prefetch_related()`:
+  ```python
+  StudentSkill.objects.filter(student=student).select_related('skill')
+  ```
 
-N+1 query / performance
-Use select_related and prefetch_related in views fetching related objects (e.g., .select_related('skill')) to reduce DB queries.
+---
 
-12 — Handover checklist (what to give the next developer)
+## Handover checklist & recommended first tasks
 
-Provide the incoming developer:
+### Handover checklist
+- GitHub repo URL and permissions
+- `requirements.txt`
+- `db.sqlite3` or `dump.json` fixture
+- Environment variables/credentials
+- List of priority tasks and known issues
 
-GitHub URL & repository permissions.
+### Recommended first 7 tasks
+1. Clone repository and run Quick Start commands
+2. Create/admin account and inspect models via Django admin
+3. Read `accounts/models.py` and `positions/models.py`
+4. Reproduce user flows:
+   - Add skill on "My Skills" page
+   - Save position and verify in Saved Positions
+   - Generate CV PDF (if available)
+5. Inspect `SavedPosition.match_score` behavior
+6. Create `static/css/style.css` with proficiency colors
+7. Run test suite: `python manage.py test`
 
-requirements.txt (included).
+---
 
-db.sqlite3 (or dump.json fixture) so they can run the Quick Start without running migrations. Decide which to include.
-
-Any environment variables or external service credentials securely (do not send passwords in chat).
-
-A short list of current top-priority tasks and known issues (CV UI problems, match-score review, etc.).
-
-Optional: a copy of .gitignore that excludes venv/.venv.
-
-13 — Recommended first tasks (exact, numbered)
-
-Clone repo and run Quick Start (above).
-
-Log into Django admin or create a superuser if one is not provided.
-
-Inspect accounts/models.py and positions/models.py in code and via admin to understand relationships.
-
-Reproduce basic user flows in a browser:
-
-Add a skill on “My Skills”.
-
-Save a position and view saved positions.
-
-Generate a CV PDF (if the endpoint exists).
-
-Locate SavedPosition.match_score and confirm the behaviour against example student records; document any differences between expected product rules and code.
-
-If desired, implement or move CSS into static/css/style.css and include it in templates/base.html.
-
-Run tests:
-
-python manage.py test
